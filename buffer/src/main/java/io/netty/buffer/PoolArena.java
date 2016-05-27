@@ -40,7 +40,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         Normal
     }
 
-    static final int numTinySubpagePools = 512 >>> 4;
+    static final int numTinySubpagePools = 512 >>> 4;//32
 
     final PooledByteBufAllocator parent;
 
@@ -89,15 +89,15 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         this.pageShifts = pageShifts;
         this.chunkSize = chunkSize;
         subpageOverflowMask = ~(pageSize - 1);
-        tinySubpagePools = newSubpagePoolArray(numTinySubpagePools);
+        tinySubpagePools = newSubpagePoolArray(numTinySubpagePools);//32个
         for (int i = 0; i < tinySubpagePools.length; i ++) {
             tinySubpagePools[i] = newSubpagePoolHead(pageSize);
         }
 
-        numSmallSubpagePools = pageShifts - 9;
+        numSmallSubpagePools = pageShifts - 9;//默认情况下 4个
         smallSubpagePools = newSubpagePoolArray(numSmallSubpagePools);
         for (int i = 0; i < smallSubpagePools.length; i ++) {
-            smallSubpagePools[i] = newSubpagePoolHead(pageSize);
+            smallSubpagePools[i] = newSubpagePoolHead(pageSize);//1k,2k,4k,8k
         }
 
         q100 = new PoolChunkList<T>(null, 100, Integer.MAX_VALUE);
@@ -145,7 +145,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     }
 
     static int tinyIdx(int normCapacity) {
-        return normCapacity >>> 4;
+        return normCapacity >>> 4;//9-4=5,2^5=32
     }
 
     static int smallIdx(int normCapacity) {
@@ -160,12 +160,12 @@ abstract class PoolArena<T> implements PoolArenaMetric {
 
     // capacity < pageSize
     boolean isTinyOrSmall(int normCapacity) {
-        return (normCapacity & subpageOverflowMask) == 0;
+        return (normCapacity & subpageOverflowMask) == 0;//13位 |small 0 000|tiny 0 0000 0000
     }
 
     // normCapacity < 512
     static boolean isTiny(int normCapacity) {
-        return (normCapacity & 0xFFFFFE00) == 0;
+        return (normCapacity & 0xFFFFFE00) == 0;//9位 			
     }
 
     private void allocate(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity) {
@@ -174,14 +174,14 @@ abstract class PoolArena<T> implements PoolArenaMetric {
             int tableIdx;
             PoolSubpage<T>[] table;
             boolean tiny = isTiny(normCapacity);
-            if (tiny) { // < 512
+            if (tiny) { // normCapacity< 512  2^9
                 if (cache.allocateTiny(this, buf, reqCapacity, normCapacity)) {
                     // was able to allocate out of the cache so move on
                     return;
                 }
                 tableIdx = tinyIdx(normCapacity);
                 table = tinySubpagePools;
-            } else {
+            } else {// 512<=normCapacity<=8192=2^13
                 if (cache.allocateSmall(this, buf, reqCapacity, normCapacity)) {
                     // was able to allocate out of the cache so move on
                     return;

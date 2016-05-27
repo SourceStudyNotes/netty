@@ -41,8 +41,8 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator {
     private static final int DEFAULT_MAX_CACHED_BUFFER_CAPACITY;
     private static final int DEFAULT_CACHE_TRIM_INTERVAL;
 
-    private static final int MIN_PAGE_SIZE = 4096;
-    private static final int MAX_CHUNK_SIZE = (int) (((long) Integer.MAX_VALUE + 1) / 2);
+    private static final int MIN_PAGE_SIZE = 4096;//page最小为4k
+    private static final int MAX_CHUNK_SIZE = (int) (((long) Integer.MAX_VALUE + 1) / 2);//chunk最大为1g
 
     static {
         int defaultPageSize = SystemPropertyUtil.getInt("io.netty.allocator.pageSize", 8192);
@@ -169,7 +169,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator {
             throw new IllegalArgumentException("nDirectArea: " + nDirectArena + " (expected: >= 0)");
         }
 
-        int pageShifts = validateAndCalculatePageShifts(pageSize);
+        int pageShifts = validateAndCalculatePageShifts(pageSize);//默认情况下（pageSize=8192）=13
 
         if (nHeapArena > 0) {
             heapArenas = newArenaArray(nHeapArena);
@@ -233,6 +233,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator {
             }
             chunkSize <<= 1;
         }
+        //确定pagesize最大是64m（2的26次方）
         return chunkSize;
     }
 
