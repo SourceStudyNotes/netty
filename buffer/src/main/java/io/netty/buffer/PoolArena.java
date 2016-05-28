@@ -52,13 +52,13 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     final int numSmallSubpagePools;
     private final PoolSubpage<T>[] tinySubpagePools;
     private final PoolSubpage<T>[] smallSubpagePools;
-
+    //init->000->025->050->075->100组成一个链
+    private final PoolChunkList<T> q100;
+    private final PoolChunkList<T> q075;
     private final PoolChunkList<T> q050;
     private final PoolChunkList<T> q025;
     private final PoolChunkList<T> q000;
     private final PoolChunkList<T> qInit;
-    private final PoolChunkList<T> q075;
-    private final PoolChunkList<T> q100;
 
     private final List<PoolChunkListMetric> chunkListMetrics;
 
@@ -100,6 +100,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
             smallSubpagePools[i] = newSubpagePoolHead(pageSize);//1k,2k,4k,8k
         }
 
+        //收到请求时，PoolChunkList处理请求的顺序：q050(50-100)->q025(25-75)->q000(1-50)->qInit(min-25)->q075(75-100)->q100(100-max)
         q100 = new PoolChunkList<T>(null, 100, Integer.MAX_VALUE);
         q075 = new PoolChunkList<T>(q100, 75, 100);
         q050 = new PoolChunkList<T>(q075, 50, 100);
@@ -137,17 +138,32 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     }
 
     abstract boolean isDirect();
-
+    /**
+     * 1.从线程私有对象池里复用可用的对象（buffer）。</br>
+     * 2.从线程缓存的队列里分配内存数组(long handler代表chunk字节数组的位置)或者直接内存。</br>
+     * @param cache
+     * @param reqCapacity
+     * @param maxCapacity
+     * @return
+     */
     PooledByteBuf<T> allocate(PoolThreadCache cache, int reqCapacity, int maxCapacity) {
         PooledByteBuf<T> buf = newByteBuf(maxCapacity);
         allocate(cache, buf, reqCapacity);
         return buf;
     }
-
+    /**
+     * （<512byte）请求内存大小的前5位代表在tiny数组的索引
+     * @param normCapacity
+     * @return
+     */
     static int tinyIdx(int normCapacity) {
         return normCapacity >>> 4;//9-4=5,2^5=32
     }
-
+    /**
+     * （8192bytes< =normCapacity <=512byte）请求内存大小的前三位，确定请求的内存大小（1k，2k，4k，8k）
+     * @param normCapacity
+     * @return
+     */
     static int smallIdx(int normCapacity) {
         int tableIdx = 0;
         int i = normCapacity >>> 10;
@@ -167,7 +183,12 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     static boolean isTiny(int normCapacity) {
         return (normCapacity & 0xFFFFFE00) == 0;//9位 			
     }
-
+    /**
+     * 
+     * @param cache
+     * @param buf
+     * @param reqCapacity
+     */
     private void allocate(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity) {
         final int normCapacity = normalizeCapacity(reqCapacity);
         if (isTinyOrSmall(normCapacity)) { // capacity < pageSize
@@ -229,6 +250,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
 
     private synchronized void allocateNormal(PooledByteBuf<T> buf, int reqCapacity, int normCapacity) {
             ++allocationsNormal;
+        //根据使用频率动态调整分配内存的chunk所属的list
         if (q050.allocate(buf, reqCapacity, normCapacity) || q025.allocate(buf, reqCapacity, normCapacity) ||
             q000.allocate(buf, reqCapacity, normCapacity) || qInit.allocate(buf, reqCapacity, normCapacity) ||
             q075.allocate(buf, reqCapacity, normCapacity) || q100.allocate(buf, reqCapacity, normCapacity)) {

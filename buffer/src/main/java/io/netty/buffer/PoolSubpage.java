@@ -81,7 +81,7 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         if (elemSize == 0) {
             return toHandle(0);
         }
-
+        
         if (numAvail == 0 || !doNotDestroy) {
             return -1;
         }
@@ -91,7 +91,7 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         int r = bitmapIdx & 63;
         assert (bitmap[q] >>> r & 1) == 0;
         bitmap[q] |= 1L << r;
-
+        //如果没有可用的内存分配，就从池里删出
         if (-- numAvail == 0) {
             removeFromPool();
         }

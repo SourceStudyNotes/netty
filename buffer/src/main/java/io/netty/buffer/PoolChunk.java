@@ -184,7 +184,9 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private PoolSubpage<T>[] newSubpageArray(int size) {
         return new PoolSubpage[size];
     }
-
+    /**
+     * 内存使用率
+     */
     @Override
     public int usage() {
         final int freeBytes = this.freeBytes;

@@ -399,10 +399,12 @@ final class PoolThreadCache {
          * Allocate something out of the cache if possible and remove the entry from the cache.
          */
         public final boolean allocate(PooledByteBuf<T> buf, int reqCapacity) {
+        	//有可用的内存
             Entry<T> entry = queue.poll();
             if (entry == null) {
                 return false;
             }
+            //用分配过来的内存初始化buffer对象
             initBuf(entry.chunk, entry.handle, buf, reqCapacity);
             entry.recycle();
 
@@ -465,7 +467,7 @@ final class PoolThreadCache {
                 this.recyclerHandle = recyclerHandle;
             }
 
-            void recycle() {
+            void recycle() {//将对象返回到池里，如果这个对象不是这个线程分配的话，就通过WeakOrderQueue返回到分配这个对象的那个线程
                 chunk = null;
                 handle = -1;
                 RECYCLER.recycle(this, recyclerHandle);
@@ -481,7 +483,7 @@ final class PoolThreadCache {
         }
 
         @SuppressWarnings("rawtypes")
-        private static final Recycler<Entry> RECYCLER = new Recycler<Entry>() {
+        private static final Recycler<Entry> RECYCLER = new Recycler<Entry>() {//Entry对象池
             @Override
             protected Entry newObject(Handle handle) {
                 return new Entry(handle);

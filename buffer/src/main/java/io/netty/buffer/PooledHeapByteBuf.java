@@ -27,7 +27,7 @@ import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 
 class PooledHeapByteBuf extends PooledByteBuf<byte[]> {
-
+	//buffer对象池
     private static final Recycler<PooledHeapByteBuf> RECYCLER = new Recycler<PooledHeapByteBuf>() {
         @Override
         protected PooledHeapByteBuf newObject(Handle<PooledHeapByteBuf> handle) {
@@ -37,7 +37,7 @@ class PooledHeapByteBuf extends PooledByteBuf<byte[]> {
 
     static PooledHeapByteBuf newInstance(int maxCapacity) {
         PooledHeapByteBuf buf = RECYCLER.get();
-        buf.reuse(maxCapacity);
+        buf.reuse(maxCapacity);//每次复用时候必须初始化一次最大容量
         return buf;
     }
 

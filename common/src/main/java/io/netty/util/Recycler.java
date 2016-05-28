@@ -102,7 +102,7 @@ public abstract class Recycler<T> {
 		}
 		Stack<T> stack = threadLocal.get();
 		DefaultHandle<T> handle = stack.pop();
-		if (handle == null) {
+		if (handle == null) {//如果没有从私有栈里找到可用的对象，直接创建一个新对象
 			handle = stack.newHandle();
 			handle.value = newObject(handle);
 		}
