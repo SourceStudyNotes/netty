@@ -37,7 +37,7 @@ package io.netty.buffer;
  * To search for the first offset in chunk that has at least requested size available we construct a
  * complete balanced binary tree and store it in an array (just like heaps) - memoryMap
  *
- * The tree looks like this (the size of each node being mentioned in the parenthesis)
+ * The tree looks like this (the size of each node being mentioned in the parenthesis(括号))
  *
  * depth=0        1 node (chunkSize)
  * depth=1        2 nodes (chunkSize/2)
@@ -53,7 +53,7 @@ package io.netty.buffer;
  * To allocate a memory segment of size chunkSize/2^k we search for the first node (from left) at height k
  * which is unused
  *
- * Algorithm:
+ * Algorithm:id 是第几个page编号
  * ----------
  * Encode the tree in memoryMap with the notation
  *   memoryMap[id] = x => in the subtree rooted at id, the first node that is free to be allocated
@@ -146,7 +146,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
         maxSubpageAllocs = 1 << maxOrder;
 
         // Generate the memory map.
-        memoryMap = new byte[maxSubpageAllocs << 1];
+        memoryMap = new byte[maxSubpageAllocs << 1];//一棵二叉树的所有节点，从根节点到最后一个叶子节点都开始编号，编号从1开始。
         depthMap = new byte[memoryMap.length];
         int memoryMapIndex = 1;
         for (int d = 0; d <= maxOrder; ++ d) { // move down the tree one level at a time
@@ -215,16 +215,17 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * need to update their state
      * The minimal depth at which subtree rooted at id has some free space
      *
-     * @param id id
+     * @param id
      */
     private void updateParentsAlloc(int id) {
         while (id > 1) {
             int parentId = id >>> 1;
+            //根据id获取左节点或者右节点
             byte val1 = value(id);
             byte val2 = value(id ^ 1);
             byte val = val1 < val2 ? val1 : val2;
-            setValue(parentId, val);
-            id = parentId;
+            setValue(parentId, val);//结果就是memoryMap[id] > depth_of_id，详情看类说明
+            id = parentId;//层层往上更新，直到root节点
         }
     }
 
@@ -261,17 +262,18 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * @param d depth
      * @return index in memoryMap
      */
-    private int allocateNode(int d) {
+    private int allocateNode(int d) {//分配这个节点，如果分配成功，将这个节点标记为不可用，maxorder＋1
+        int initial = - (1 << d); // has last d bits = 0 and rest all = 1，initial补码表示为最后的d个bit全部为0，其余为1
         int id = 1;
-        int initial = - (1 << d); // has last d bits = 0 and rest all = 1
-        byte val = value(id);
-        if (val > d) { // unusable
+        byte val = value(id);//这里的id就是上面初始化时的memoryMapIndex
+        if (val > d) { // unusable，不可以分配这个节点
             return -1;
         }
+        //从root节点开始遍历
         while (val < d || (id & initial) == 0) { // id & initial == 1 << d for all ids at depth d, for < d it is 0
-            id <<= 1;
+            id <<= 1;//往后前进一层
             val = value(id);
-            if (val > d) {
+            if (val > d) {//如果第一个节点不合适，检查兄弟节点
                 id ^= 1;
                 val = value(id);
             }
@@ -279,7 +281,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
         byte value = value(id);
         assert value == d && (id & initial) == 1 << d : String.format("val = %d, id & initial = %d, d = %d",
                 value, id & initial, d);
-        setValue(id, unusable); // mark as unusable
+        setValue(id, unusable); // mark as unusable，直接将此节点设置成不可用。
         updateParentsAlloc(id);
         return id;
     }
@@ -291,7 +293,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * @return index in memoryMap
      */
     private long allocateRun(int normCapacity) {
-        int d = maxOrder - (log2(normCapacity) - pageShifts);
+        int d = maxOrder - (log2(normCapacity) - pageShifts);//请求内存的大小减去页面大小，可以确定在二叉树哪一层申请分配内存
         int id = allocateNode(d);
         if (id < 0) {
             return id;
@@ -413,15 +415,23 @@ final class PoolChunk<T> implements PoolChunkMetric {
         // compute the (0-based, with lsb = 0) position of highest set bit i.e, log2
         return Integer.SIZE - 1 - Integer.numberOfLeadingZeros(val);
     }
-
+    /**
+     * 每个层级都有固定的字节大小，只需根据id获取所在的层，便可以算出来分配的字节的数量
+     * @param id
+     * @return
+     */
     private int runLength(int id) {
         // represents the size in #bytes supported by node 'id' in the tree
-        return 1 << log2ChunkSize - depth(id);
+        return 1 << (log2ChunkSize - depth(id));
     }
-
+    /**
+     * 计算id所在层级在chunk内存数组的索引
+     * @param id
+     * @return
+     */
     private int runOffset(int id) {
         // represents the 0-based offset in #bytes from start of the byte-array chunk
-        int shift = id ^ 1 << depth(id);
+        int shift = id ^ 1 << depth(id);//eg:如果id为6，dept为2，shift结果将是2。很神奇的计算。
         return shift * runLength(id);
     }
 

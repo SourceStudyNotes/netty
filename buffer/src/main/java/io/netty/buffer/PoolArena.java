@@ -50,8 +50,8 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     final int chunkSize;
     final int subpageOverflowMask;
     final int numSmallSubpagePools;
-    private final PoolSubpage<T>[] tinySubpagePools;
-    private final PoolSubpage<T>[] smallSubpagePools;
+    private final PoolSubpage<T>[] tinySubpagePools;//默认按照请求内存的大小把page分成32组
+    private final PoolSubpage<T>[] smallSubpagePools;//默认按照请求内存大小把page分成4组（1k，2k，4k，8k）
     //init->000->025->050->075->100组成一个链
     private final PoolChunkList<T> q100;
     private final PoolChunkList<T> q075;
@@ -693,7 +693,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         }
 
         @Override
-        protected PoolChunk<ByteBuffer> newChunk(int pageSize, int maxOrder, int pageShifts, int chunkSize) {
+		protected PoolChunk<ByteBuffer> newChunk(int pageSize, int maxOrder, int pageShifts, int chunkSize) {
             return new PoolChunk<ByteBuffer>(
                     this, ByteBuffer.allocateDirect(chunkSize), pageSize, maxOrder, pageShifts, chunkSize);
         }
