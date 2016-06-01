@@ -26,9 +26,9 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
  */
 public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
 
+	//这样比使用jdk提供的atomic类节省很多内存，所以netty这种updater特别多
+	//http://normanmaurer.me/blog/2013/10/28/Lesser-known-concurrent-classes-Part-1/
     private static final AtomicIntegerFieldUpdater<AbstractReferenceCountedByteBuf> refCntUpdater;
-    //这样比使用jdk提供的atomic类节省很多内存，所以netty这种updater特别多
-    //http://normanmaurer.me/blog/2013/10/28/Lesser-known-concurrent-classes-Part-1/
     static {
         AtomicIntegerFieldUpdater<AbstractReferenceCountedByteBuf> updater =
                 PlatformDependent.newAtomicIntegerFieldUpdater(AbstractReferenceCountedByteBuf.class, "refCnt");
@@ -111,7 +111,7 @@ public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
             if (refCnt == 0) {
                 throw new IllegalReferenceCountException(0, -1);
             }
-
+            
             if (refCntUpdater.compareAndSet(this, refCnt, refCnt - 1)) {
                 if (refCnt == 1) {
                     deallocate();

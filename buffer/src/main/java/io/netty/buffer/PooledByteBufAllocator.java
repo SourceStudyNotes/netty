@@ -169,8 +169,8 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator {
             throw new IllegalArgumentException("nDirectArea: " + nDirectArena + " (expected: >= 0)");
         }
 
-        int pageShifts = validateAndCalculatePageShifts(pageSize);//默认情况下（pageSize=8192）=13
-
+        int pageShifts = validateAndCalculatePageShifts(pageSize);//默认情况下（pageSize=8192
+        
         if (nHeapArena > 0) {
             heapArenas = newArenaArray(nHeapArena);
             List<PoolArenaMetric> metrics = new ArrayList<PoolArenaMetric>(heapArenas.length);
@@ -216,7 +216,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator {
         }
 
         // Logarithm base 2. At this point we know that pageSize is a power of two.
-        return Integer.SIZE - 1 - Integer.numberOfLeadingZeros(pageSize);
+        return Integer.SIZE - 1 - Integer.numberOfLeadingZeros(pageSize);//32位减去一个符号位，再减去pagesize之前的0
     }
 
     private static int validateAndCalculateChunkSize(int pageSize, int maxOrder) {

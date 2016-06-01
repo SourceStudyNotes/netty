@@ -122,7 +122,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     private int freeBytes;
 
-    PoolChunkList<T> parent;
+    PoolChunkList<T> parent;//属于哪个list
     PoolChunk<T> prev;
     PoolChunk<T> next;
 
@@ -159,7 +159,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
             }
         }
 
-        subpages = newSubpageArray(maxSubpageAllocs);
+        subpages = newSubpageArray(maxSubpageAllocs);//初始化所有叶子节点
     }
 
     /** Creates a special chunk that is not pooled. */
@@ -200,7 +200,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
         }
         return 100 - freePercentage;
     }
-
+    //分配小于一页或者大于一页小于一个chunk
     long allocate(int normCapacity) {
         if ((normCapacity & subpageOverflowMask) != 0) { // >= pageSize
             return allocateRun(normCapacity);
@@ -266,15 +266,15 @@ final class PoolChunk<T> implements PoolChunkMetric {
         int initial = - (1 << d); // has last d bits = 0 and rest all = 1，initial补码表示为最后的d个bit全部为0，其余为1
         int id = 1;
         byte val = value(id);//这里的id就是上面初始化时的memoryMapIndex
-        if (val > d) { // unusable，不可以分配这个节点
-            return -1;
+        if (val > d) { // 或者有一个子节点已经分配，或者整个节点已经标记为unusable
+            return -1;//供后面判断分配结果
         }
         //从root节点开始遍历
         while (val < d || (id & initial) == 0) { // id & initial == 1 << d for all ids at depth d, for < d it is 0
             id <<= 1;//往后前进一层
             val = value(id);
-            if (val > d) {//如果第一个节点不合适，检查兄弟节点
-                id ^= 1;
+            if (val > d) {
+                id ^= 1;//如果第一个节点不合适，检查兄弟节点
                 val = value(id);
             }
         }
@@ -317,7 +317,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
             int d = maxOrder; // subpages are only be allocated from pages i.e., leaves
             int id = allocateNode(d);
             if (id < 0) {
-                return id;
+                return id;//分配失败
             }
 
             final PoolSubpage<T>[] subpages = this.subpages;
@@ -328,9 +328,11 @@ final class PoolChunk<T> implements PoolChunkMetric {
             int subpageIdx = subpageIdx(id);
             PoolSubpage<T> subpage = subpages[subpageIdx];
             if (subpage == null) {
+            	//创建一个一个PoolSubpage，然后连接到this.subpages里和arena的subpage pool里
                 subpage = new PoolSubpage<T>(head, this, id, runOffset(id), pageSize, normCapacity);
                 subpages[subpageIdx] = subpage;
             } else {
+            	//放入arena的subpage pool里
                 subpage.init(head, normCapacity);
             }
             return subpage.allocate();

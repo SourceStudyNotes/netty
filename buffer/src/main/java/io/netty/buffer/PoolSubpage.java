@@ -46,13 +46,21 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         this.pageSize = pageSize;
         bitmap = null;
     }
-
+    /**
+     * 
+     * @param head arena subpage pool的链表头
+     * @param chunk 所属的chunk
+     * @param memoryMapIdx 在二叉树中的节点编号
+     * @param runOffset 在chunk内存数组中的第字节索引
+     * @param pageSize 页面大小
+     * @param elemSize 这个页面用来分配多大的元素，1k，2k，4k，8k，或者16bytes，32bytes，64bytes等
+     */
     PoolSubpage(PoolSubpage<T> head, PoolChunk<T> chunk, int memoryMapIdx, int runOffset, int pageSize, int elemSize) {
         this.chunk = chunk;
         this.memoryMapIdx = memoryMapIdx;
         this.runOffset = runOffset;
         this.pageSize = pageSize;
-        bitmap = new long[pageSize >>> 10]; // pageSize / 16 / 64
+        bitmap = new long[pageSize >>> 10]; // pageSize / 16 / 64，默认bitmap.length＝8，8个long一共是512位，可以标志512个元素的分配情况
         init(head, elemSize);
     }
 
@@ -60,10 +68,10 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         doNotDestroy = true;
         this.elemSize = elemSize;
         if (elemSize != 0) {
-            maxNumElems = numAvail = pageSize / elemSize;
+            maxNumElems = numAvail = pageSize / elemSize;//elemSize最小为16bytes，maxNumElems＝512=2^9
             nextAvail = 0;
-            bitmapLength = maxNumElems >>> 6;
-            if ((maxNumElems & 63) != 0) {
+            bitmapLength = maxNumElems >>> 6;//maxNumElems／64，需要几个long
+            if ((maxNumElems & 63) != 0) {//maxNumElems小于64的，一个long便可以标志
                 bitmapLength ++;
             }
 
@@ -134,7 +142,10 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
             return false;
         }
     }
-
+    /**
+     * 放到head.next
+     * @param head
+     */
     private void addToPool(PoolSubpage<T> head) {
         assert prev == null && next == null;
         prev = head;
@@ -157,32 +168,43 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
 
     private int getNextAvail() {
         int nextAvail = this.nextAvail;
-        if (nextAvail >= 0) {
+        if (nextAvail >= 0) {//有free的内存，这里可以直接使用
             this.nextAvail = -1;
             return nextAvail;
         }
         return findNextAvail();
     }
-
+    /**
+     * 循环遍历所有的bitmap，查找可用内存
+     * @return
+     */
     private int findNextAvail() {
         final long[] bitmap = this.bitmap;
         final int bitmapLength = this.bitmapLength;
         for (int i = 0; i < bitmapLength; i ++) {
             long bits = bitmap[i];
-            if (~bits != 0) {
+            if (~bits != 0) {//如果bits＝1111 1111，表示没有可分配的内存
                 return findNextAvail0(i, bits);
             }
         }
         return -1;
     }
-
+    /**
+     * 从一个long中查找可用内存
+     * 0(i).		0  1  2  3  4  5...
+     * 1(i).		64(baseVal｜j) 65 66 67 68..
+     * 
+     * @param i
+     * @param bits
+     * @return
+     */
     private int findNextAvail0(int i, long bits) {
         final int maxNumElems = this.maxNumElems;
         final int baseVal = i << 6;
 
         for (int j = 0; j < 64; j ++) {
             if ((bits & 1) == 0) {
-                int val = baseVal | j;
+                int val = baseVal | j;//每64个elem为一组，i代表组号，baseVal｜j表示第几个bitmap index
                 if (val < maxNumElems) {
                     return val;
                 } else {

@@ -385,6 +385,7 @@ final class PoolThreadCache {
          */
         @SuppressWarnings("unchecked")
         public final boolean add(PoolChunk<T> chunk, long handle) {
+        	//用自己的对象包装内存
             Entry<T> entry = newEntry(chunk, handle);
             boolean queued = queue.offer(entry);
             if (!queued) {
@@ -400,13 +401,13 @@ final class PoolThreadCache {
          */
         public final boolean allocate(PooledByteBuf<T> buf, int reqCapacity) {
         	//有可用的内存
-            Entry<T> entry = queue.poll();
+            Entry<T> entry = queue.poll();//entry都是自己放进去的
             if (entry == null) {
                 return false;
             }
             //用分配过来的内存初始化buffer对象
             initBuf(entry.chunk, entry.handle, buf, reqCapacity);
-            entry.recycle();
+            entry.recycle();//将对象放回对象池
 
             // allocations is not thread-safe which is fine as this is only called from the same thread all time.
             ++ allocations;

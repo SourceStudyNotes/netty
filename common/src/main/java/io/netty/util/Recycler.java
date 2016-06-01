@@ -31,6 +31,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Light-weight object pool based on a thread-local stack.
+ * 
+ * allocate---->Thread->Stack->Handle->Buffer<byte[]>->initBuffer 
+ * deallocate---->Buffer<byte[]>->Handle->Stack->Thread
  *
  * @param <T>
  *            the type of the pooled object
@@ -136,7 +139,7 @@ public abstract class Recycler<T> {
 	public interface Handle<T> {
 		void recycle(T object);
 	}
-
+	
 	static final class DefaultHandle<T> implements Handle<T> {
 		private int lastRecycledId;//这里不是violate，所以有可见性问题
 		private int recycleId;
@@ -323,7 +326,7 @@ public abstract class Recycler<T> {
 		// to scavenge those that can be reused. this permits us to incur
 		// minimal thread synchronisation whilst
 		// still recycling all items.
-		final Recycler<T> parent;//某个循环对象
+		final Recycler<T> parent;//某个可复用对象工具
 		final Thread thread;
 		private DefaultHandle<?>[] elements;
 		private final int maxCapacity;

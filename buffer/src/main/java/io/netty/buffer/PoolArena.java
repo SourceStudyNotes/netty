@@ -112,7 +112,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         q075.prevList(q050);
         q050.prevList(q025);
         q025.prevList(q000);
-        q000.prevList(null);
+        q000.prevList(null);//使用率小于1，将把chunk从list中删除，详见PoolChunkList.free
         qInit.prevList(qInit);
 
         List<PoolChunkListMetric> metrics = new ArrayList<PoolChunkListMetric>(6);
@@ -124,7 +124,11 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         metrics.add(q100);
         chunkListMetrics = Collections.unmodifiableList(metrics);
     }
-
+    /**
+     * head不做具体分配，分配走head.next
+     * @param pageSize
+     * @return
+     */
     private PoolSubpage<T> newSubpagePoolHead(int pageSize) {
         PoolSubpage<T> head = new PoolSubpage<T>(pageSize);
         head.prev = head;
@@ -191,7 +195,8 @@ abstract class PoolArena<T> implements PoolArenaMetric {
      */
     private void allocate(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity) {
         final int normCapacity = normalizeCapacity(reqCapacity);
-        if (isTinyOrSmall(normCapacity)) { // capacity < pageSize
+        // 1.请求分配的内存小于内存页大小
+        if (isTinyOrSmall(normCapacity)) { 
             int tableIdx;
             PoolSubpage<T>[] table;
             boolean tiny = isTiny(normCapacity);
@@ -233,9 +238,11 @@ abstract class PoolArena<T> implements PoolArenaMetric {
                     return;
                 }
             }
+            //对象池里没有可用内存，从chunklist中分配
             allocateNormal(buf, reqCapacity, normCapacity);
             return;
         }
+        //2.请求分配内存大与内存页小与一个chunk大小
         if (normCapacity <= chunkSize) {
             if (cache.allocateNormal(this, buf, reqCapacity, normCapacity)) {
                 // was able to allocate out of the cache so move on
@@ -243,21 +250,27 @@ abstract class PoolArena<T> implements PoolArenaMetric {
             }
             allocateNormal(buf, reqCapacity, normCapacity);
         } else {
+        	//3.请求内存大小超过一个chunk
             // Huge allocations are never served via the cache so just call allocateHuge
             allocateHuge(buf, reqCapacity);
         }
     }
-
+    /**
+     * 先从chunklist分配，如果没有分配成功，新建chunk，再分配
+     * @param buf
+     * @param reqCapacity
+     * @param normCapacity
+     */
     private synchronized void allocateNormal(PooledByteBuf<T> buf, int reqCapacity, int normCapacity) {
             ++allocationsNormal;
-        //根据使用频率动态调整分配内存的chunk所属的list
+        //根据内存使用率动态调整分配内存的chunk所属的list
         if (q050.allocate(buf, reqCapacity, normCapacity) || q025.allocate(buf, reqCapacity, normCapacity) ||
             q000.allocate(buf, reqCapacity, normCapacity) || qInit.allocate(buf, reqCapacity, normCapacity) ||
             q075.allocate(buf, reqCapacity, normCapacity) || q100.allocate(buf, reqCapacity, normCapacity)) {
             return;
         }
 
-        // Add a new chunk.
+        // List中没有可用的内存，新建立一个chunk。
         PoolChunk<T> c = newChunk(pageSize, maxOrder, pageShifts, chunkSize);
         long handle = c.allocate(normCapacity);
         assert handle > 0;
@@ -271,7 +284,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     }
 
     void free(PoolChunk<T> chunk, long handle, int normCapacity, PoolThreadCache cache) {
-        if (chunk.unpooled) {
+        if (chunk.unpooled) {//详情看PoolChunk的构造函数，huge内存不做池化，并且也不放入线程缓冲池中。
             allocationsHuge.decrement();
             destroyChunk(chunk);
         } else {
@@ -640,7 +653,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     }
 
     static final class HeapArena extends PoolArena<byte[]> {
-
+    	//默认pageshifts为13
         HeapArena(PooledByteBufAllocator parent, int pageSize, int maxOrder, int pageShifts, int chunkSize) {
             super(parent, pageSize, maxOrder, pageShifts, chunkSize);
         }

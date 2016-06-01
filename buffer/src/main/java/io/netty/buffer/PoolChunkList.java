@@ -74,7 +74,7 @@ final class PoolChunkList<T> implements PoolChunkListMetric {
     boolean free(PoolChunk<T> chunk, long handle) {
         chunk.free(handle);
         if (chunk.usage() < minUsage) {
-            remove(chunk);
+            remove(chunk);//
             if (prevList == null) {
                 assert chunk.usage() == 0;
                 return false;
@@ -87,12 +87,14 @@ final class PoolChunkList<T> implements PoolChunkListMetric {
     }
 
     void add(PoolChunk<T> chunk) {
+    	//加入之前判断使用了多少字节
         if (chunk.usage() >= maxUsage) {
             nextList.add(chunk);
             return;
         }
 
         chunk.parent = this;
+        //将新增的chunk作为链表的头部插入
         if (head == null) {
             head = chunk;
             chunk.prev = null;
