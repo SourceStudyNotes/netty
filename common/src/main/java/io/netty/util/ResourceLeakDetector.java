@@ -147,7 +147,7 @@ public final class ResourceLeakDetector<T> {
     private final DefaultResourceLeak head = new DefaultResourceLeak(null);
     private final DefaultResourceLeak tail = new DefaultResourceLeak(null);
 
-    private final ReferenceQueue<Object> refQueue = new ReferenceQueue<Object>();
+    private final ReferenceQueue<Object> refQueue = new ReferenceQueue<Object>();//记录需要探测的对象，如果这个对象被gc，refQueue.poll!=null
     private final ConcurrentMap<String, Boolean> reportedLeaks = PlatformDependent.newConcurrentHashMap();
 
     private final String resourceType;
@@ -249,7 +249,7 @@ public final class ResourceLeakDetector<T> {
 
             ref.clear();
 
-            if (!ref.close()) {
+            if (!ref.close()) {//如果关闭成功，说明被Gc的时候没有release，所以需要上报。
                 continue;
             }
 
@@ -308,7 +308,7 @@ public final class ResourceLeakDetector<T> {
 
         @Override
         public void record() {
-            record0(null, 3);
+            record0(null, 3);//跳过3个栈帧，这三个栈帧都是netty自己的，所以不做记录
         }
 
         @Override

@@ -46,6 +46,7 @@ public class ProtobufVarint32FrameDecoder extends ByteToMessageDecoder {
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out)
             throws Exception {
+    	in.readByte();
         in.markReaderIndex();
         int preIndex = in.readerIndex();
         int length = readRawVarint32(in);
