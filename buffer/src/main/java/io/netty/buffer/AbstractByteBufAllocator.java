@@ -25,6 +25,7 @@ import io.netty.util.internal.StringUtil;
  * Skeletal {@link ByteBufAllocator} implementation to extend.
  */
 public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
+    //增加注释！！发的开发来得及
     private static final int DEFAULT_INITIAL_CAPACITY = 256;
     static final int DEFAULT_MAX_COMPONENTS = 16;
 
