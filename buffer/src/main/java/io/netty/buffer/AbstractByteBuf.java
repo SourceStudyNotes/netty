@@ -40,6 +40,7 @@ import static io.netty.util.internal.MathUtil.isOutOfBounds;
  * A skeletal implementation of a buffer.
  */
 public abstract class AbstractByteBuf extends ByteBuf {
+    //增加注释！！！
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractByteBuf.class);
     private static final String PROP_MODE = "io.netty.buffer.bytebuf.checkAccessible";
     private static final boolean checkAccessible;
